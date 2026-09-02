@@ -1,5 +1,6 @@
-limit_req_zone  $binary_remote_addr zone=general:10m   rate=30r/s;
-limit_req_zone  $binary_remote_addr zone=sensitive:10m rate=2r/s;
+limit_req_zone  $binary_remote_addr zone=general:10m   rate=100r/s;
+limit_req_zone  $binary_remote_addr zone=sensitive:10m rate=10r/s;
+limit_req_zone  $binary_remote_addr zone=unknown:10m   rate=1r/s;
 limit_conn_zone $binary_remote_addr zone=perip:10m;
 limit_req_status  429;
 limit_conn_status 429;
@@ -10,6 +11,7 @@ log_format gateway '$remote_addr xff="$http_x_forwarded_for" host="$host" '
                    'request="$request"';
 access_log /var/log/nginx/access.log gateway;
 server_tokens off;
+client_max_body_size 100m;
 
 upstream hub_backend {
     server 127.0.0.1:${HUB_BACKEND_PORT};
@@ -25,7 +27,18 @@ upstream tian_backend {
 server {
     listen 80 default_server;
     server_name _;
-    return 444;
+    error_page 429 /50x.html;
+
+    location = /50x.html {
+        internal;
+        root /usr/share/nginx/html;
+    }
+
+    location / {
+        limit_req zone=unknown burst=2 nodelay;
+        limit_conn perip 8;
+        deny all;
+    }
 }
 
 server {
@@ -35,8 +48,18 @@ server {
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
     ssl_certificate_key /etc/nginx/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    error_page 429 /50x.html;
 
-    return 444;
+    location = /50x.html {
+        internal;
+        root /usr/share/nginx/html;
+    }
+
+    location / {
+        limit_req zone=unknown burst=2 nodelay;
+        limit_conn perip 8;
+        deny all;
+    }
 }
 
 # Gateway owns the only public HTTP-to-HTTPS redirect.
@@ -67,8 +90,8 @@ server {
     }
 
     location ~ ^/(?:admin|api)(?:/|$) {
-        limit_req zone=sensitive burst=10 nodelay;
-        limit_conn perip 24;
+        limit_req zone=sensitive burst=20 nodelay;
+        limit_conn perip 200;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 300s;
@@ -83,8 +106,8 @@ server {
     }
 
     location / {
-        limit_req zone=general burst=60 nodelay;
-        limit_conn perip 24;
+        limit_req zone=general burst=200 nodelay;
+        limit_conn perip 200;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 300s;
@@ -120,8 +143,8 @@ server {
     }
 
     location ~ ^/(?:admin|api)(?:/|$) {
-        limit_req zone=sensitive burst=10 nodelay;
-        limit_conn perip 24;
+        limit_req zone=sensitive burst=20 nodelay;
+        limit_conn perip 200;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 300s;
@@ -136,8 +159,8 @@ server {
     }
 
     location / {
-        limit_req zone=general burst=60 nodelay;
-        limit_conn perip 24;
+        limit_req zone=general burst=200 nodelay;
+        limit_conn perip 200;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 300s;
@@ -172,11 +195,13 @@ server {
         return 200 "ok\n";
     }
 
-    # TODO(zhitian): keep the stricter route set empty until the zhitian commander
-    # confirms paths. /chat/stream is a 30-90 second SSE connection and must not be guessed.
+    # TODO(zhitian): keep the stricter route set empty until the zhitian commander confirms paths.
+    # SSE routes that must not be guessed into a stricter class:
+    # POST /chat/stream             (conversation stream, usually 30-90 seconds)
+    # GET  /tasks/{task_id}/stream  (document-ingestion progress, duration varies by document)
     location / {
-        limit_req zone=general burst=60 nodelay;
-        limit_conn perip 24;
+        limit_req zone=general burst=200 nodelay;
+        limit_conn perip 200;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 300s;
@@ -190,6 +215,7 @@ server {
         proxy_pass http://tian_backend;
     }
 }
+
 server {
     listen 443 ssl;
     server_name ${ADMIN_SERVER_NAME};
@@ -210,11 +236,13 @@ server {
         return 200 "ok\n";
     }
 
-    # TODO(zhitian): keep the stricter route set empty until the zhitian commander
-    # confirms paths. /chat/stream is a 30-90 second SSE connection and must not be guessed.
+    # TODO(zhitian): keep the stricter route set empty until the zhitian commander confirms paths.
+    # SSE routes that must not be guessed into a stricter class:
+    # POST /chat/stream             (conversation stream, usually 30-90 seconds)
+    # GET  /tasks/{task_id}/stream  (document-ingestion progress, duration varies by document)
     location / {
-        limit_req zone=general burst=60 nodelay;
-        limit_conn perip 24;
+        limit_req zone=general burst=200 nodelay;
+        limit_conn perip 200;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_read_timeout 300s;
