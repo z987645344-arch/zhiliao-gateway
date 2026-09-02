@@ -1,0 +1,230 @@
+limit_req_zone  $binary_remote_addr zone=general:10m   rate=30r/s;
+limit_req_zone  $binary_remote_addr zone=sensitive:10m rate=2r/s;
+limit_conn_zone $binary_remote_addr zone=perip:10m;
+limit_req_status  429;
+limit_conn_status 429;
+
+log_format gateway '$remote_addr xff="$http_x_forwarded_for" host="$host" '
+                   'status=$status request_time=$request_time '
+                   'upstream_addr="$upstream_addr" upstream_status="$upstream_status" '
+                   'request="$request"';
+access_log /var/log/nginx/access.log gateway;
+server_tokens off;
+
+upstream hub_backend {
+    server 127.0.0.1:${HUB_BACKEND_PORT};
+    keepalive 32;
+}
+
+upstream tian_backend {
+    server 127.0.0.1:${TIAN_BACKEND_PORT};
+    keepalive 32;
+}
+
+# Unknown Host values, including direct-IP scans, must never fall through to a real site.
+server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    return 444;
+}
+
+# Gateway owns the only public HTTP-to-HTTPS redirect.
+server {
+    listen 80;
+    server_name ${MAIN_SERVER_NAME} ${LAB_SERVER_NAME} ${AGENT_SERVER_NAME} ${ADMIN_SERVER_NAME};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${MAIN_SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    error_page 429 502 503 504 /50x.html;
+
+    location = /50x.html {
+        internal;
+        root /usr/share/nginx/html;
+    }
+
+    location = /gateway-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location ~ ^/(?:admin|api)(?:/|$) {
+        limit_req zone=sensitive burst=10 nodelay;
+        limit_conn perip 24;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://hub_backend;
+    }
+
+    location / {
+        limit_req zone=general burst=60 nodelay;
+        limit_conn perip 24;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://hub_backend;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ${LAB_SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    error_page 429 502 503 504 /50x.html;
+
+    location = /50x.html {
+        internal;
+        root /usr/share/nginx/html;
+    }
+
+    location = /gateway-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location ~ ^/(?:admin|api)(?:/|$) {
+        limit_req zone=sensitive burst=10 nodelay;
+        limit_conn perip 24;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://hub_backend;
+    }
+
+    location / {
+        limit_req zone=general burst=60 nodelay;
+        limit_conn perip 24;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://hub_backend;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ${AGENT_SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    error_page 429 502 503 504 /50x.html;
+
+    location = /50x.html {
+        internal;
+        root /usr/share/nginx/html;
+    }
+
+    location = /gateway-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # TODO(zhitian): keep the stricter route set empty until the zhitian commander
+    # confirms paths. /chat/stream is a 30-90 second SSE connection and must not be guessed.
+    location / {
+        limit_req zone=general burst=60 nodelay;
+        limit_conn perip 24;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://tian_backend;
+    }
+}
+server {
+    listen 443 ssl;
+    server_name ${ADMIN_SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    error_page 429 502 503 504 /50x.html;
+
+    location = /50x.html {
+        internal;
+        root /usr/share/nginx/html;
+    }
+
+    location = /gateway-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # TODO(zhitian): keep the stricter route set empty until the zhitian commander
+    # confirms paths. /chat/stream is a 30-90 second SSE connection and must not be guessed.
+    location / {
+        limit_req zone=general burst=60 nodelay;
+        limit_conn perip 24;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://tian_backend;
+    }
+}

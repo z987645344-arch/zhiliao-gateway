@@ -1,0 +1,33 @@
+services:
+  gateway:
+    image: nginx:stable-alpine
+    network_mode: host
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      MAIN_SERVER_NAME: ${MAIN_SERVER_NAME:?MAIN_SERVER_NAME is required}
+      LAB_SERVER_NAME: ${LAB_SERVER_NAME:?LAB_SERVER_NAME is required}
+      AGENT_SERVER_NAME: ${AGENT_SERVER_NAME:?AGENT_SERVER_NAME is required}
+      ADMIN_SERVER_NAME: ${ADMIN_SERVER_NAME:?ADMIN_SERVER_NAME is required}
+      HUB_BACKEND_PORT: ${HUB_BACKEND_PORT:?HUB_BACKEND_PORT is required}
+      TIAN_BACKEND_PORT: ${TIAN_BACKEND_PORT:?TIAN_BACKEND_PORT is required}
+    volumes:
+      - type: bind
+        source: ./nginx/gateway.conf.template
+        target: /etc/nginx/templates/default.conf.template
+        read_only: true
+      - type: bind
+        source: ${TLS_CERT_PATH:?TLS_CERT_PATH is required}
+        target: /etc/nginx/tls/fullchain.pem
+        read_only: true
+      - type: bind
+        source: ${TLS_KEY_PATH:?TLS_KEY_PATH is required}
+        target: /etc/nginx/tls/privkey.pem
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
