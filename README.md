@@ -75,6 +75,11 @@ certbot renew --deploy-hook 'docker compose --project-directory CHANGE_ME_GATEWA
 
 不得在 hook 后添加 `|| true` 或吞掉退出码。deploy hook 发生在证书已成功续期之后：reload 失败不会撤销已经续好的证书，但属于独立故障，必须由 Certbot/systemd 的失败状态或告警发现并修复；修复前 gateway 仍可能继续提供旧证书。
 
+续期走 DNS-01——这是通配符证书的必然要求，因此不需要
+`/.well-known/acme-challenge/`，gateway 独占 80/443 与续期不冲突。
+⚠️ 若将来改用非通配证书、或新增不在通配范围内的域名，验证会退回 HTTP-01，
+必须先在 gateway 增加挑战路径，否则续期静默失败、直到证书过期站点全挂才被发现。
+
 ## 故障域
 
 **gateway 挂掉意味着两个站点同时不可访问。** 这是只有一个公网 IP 的必然代价。采用独立 gateway 的收益是两个项目的常规部署不再触碰公网 80/443，使“哪些操作可能引发共同故障”更少，并不代表共同故障域变小。
@@ -82,6 +87,14 @@ certbot renew --deploy-hook 'docker compose --project-directory CHANGE_ME_GATEWA
 ## 上线验收
 
 上线时必须在真实服务器补齐以下验证，本地静态审阅不能替代：
+
+⚠️ 上机后的第一项验证，必须是「gateway 访问日志里的 `$remote_addr`
+是不是访问者的真实出口 IP」。公网流量经 VPC NAT 进入本机，
+若该 NAT 不保留源 IP，`$remote_addr` 会变成一个固定地址，于是：
+所有限速分桶塌成一个、传给两个后端的 XFF 末位全一样、
+两个项目的应用层按 IP 分桶同时失效——**而且一切看起来完全正常，不报任何错**。
+验法：从开发机访问一次，比对日志行首与开发机的真实出口 IP。
+**这一条不过，本文件里所有限速阈值都没有意义。**
 
 - 真实证书下四个主机名无需跳过 TLS 校验即可访问，并分别命中预期上游。
 - 从真实外部客户端请求后，gateway 日志中的 `$remote_addr` 是该客户端地址；继续核对两级后端最终采用的 IP 分桶键。
