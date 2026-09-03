@@ -2,6 +2,17 @@
 
 > 每轮完成改动后在此追加记录，新条目放在最前。
 
+## Git标签 v0.2 - 2026-09-04
+
+- **覆盖 1 条工作条目、2 个提交**，其中 1 个属本轮存档动作本身：2026-09-04 为关闭Cloudflare代理补齐www主域规范化（`219c137`），以及本条存档提交。
+- **版本语义**：本批新增www的HTTPS 301规范化路由，并将www纳入80端口跳转块，属于路由行为变化，因此使用两段式 `v0.2`；gateway仍未在生产真实承接流量，继续留在 `0.x`，不以 `1.0` 暗示生产验证已经完成。
+- **动因与前提**：www→主域跳转此前住在Cloudflare规则中而非本仓库；直连源站的www返回200不跳转，经Cloudflare的301不含源站响应头。关闭代理后外部规则会立即失效，www随即落入default 403，因此本改动是关闭Cloudflare代理的前置条件，也是“配置住在别处、本地看不见”的实例。
+- **行为与回归证据**：独立443块把www以301永久跳转到主域并由 `$request_uri` 保留路径与查询串；四个既有业务server块的反代、转发头、限速和超时未改。复核日志为主域 `upstream_addr="127.0.0.1:31001" upstream_status="502"`（进入既有hub反代），未知Host `upstream_addr="-" upstream_status="-"` 且返回403（从未进入反代）。
+- **本轮独立门禁**：`docker compose config --quiet` 通过；官方 `nginx:stable-alpine` 对渲染配置执行真实 `nginx -t` 通过，无 `${WWW_SERVER_NAME}` 字面量残留；占位主机名下www返回301，`Location` 保留 `/deep/path?alpha=1&beta=2`。
+- `CHANGELOG.md` **+11/-0**：新增本条v0.2存档记录；没有修改Nginx模板、Compose、环境变量模板或其他实现文件。
+- **CI边界**：本仓库当前没有 `.github/` 与GitHub Actions运行记录，本标签无CI结论；门禁仅为上述本地渲染、真实Nginx语法检查、动态路由证据与人工核对，本轮不顺带新增CI。
+- **未验证边界**：未连接服务器、未部署；真实证书、真实域名、关闭Cloudflare代理后的公网行为均未验证，gateway仍未在生产真实承接流量。通配证书覆盖www属于统筹师现场实测的转述，不作为本轮独立验证结论。
+
 ## 2026-09-04 为关闭Cloudflare代理补齐www主域规范化
 
 - `.env.example` **+2/-0**：新增 `WWW_SERVER_NAME` 的 `CHANGE_ME_*` 占位，并注明它是 `MAIN_SERVER_NAME` 的规范化跳转别名。
