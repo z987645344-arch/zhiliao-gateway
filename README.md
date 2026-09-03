@@ -4,7 +4,7 @@
 
 ## 拓扑与安全边界
 
-四个主机名通过环境变量配置，其中两项转发到 `127.0.0.1:${HUB_BACKEND_PORT}`，另外两项转发到 `127.0.0.1:${TIAN_BACKEND_PORT}`。仓库只保存 `CHANGE_ME_*` 占位符；真实主机名、IP、证书路径和凭据不得进入 Git。
+五个主机名通过环境变量配置：主域与小作坊域转发到 `127.0.0.1:${HUB_BACKEND_PORT}`，另外两个业务域转发到 `127.0.0.1:${TIAN_BACKEND_PORT}`，`WWW_SERVER_NAME` 则永久跳转到 `MAIN_SERVER_NAME` 并保留路径与查询串。仓库只保存 `CHANGE_ME_*` 占位符；真实主机名、IP、证书路径和凭据不得进入 Git。
 
 gateway 使用 `network_mode: host`，理由是：
 
@@ -32,8 +32,8 @@ gateway 固定传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto` 和 `
 
 ## 路由与流量控制
 
-- 四个 HTTPS `server` 块严格按主机名路由；不匹配的 Host 或直连 IP 请求由 `default_server` 直接拒绝。
-- 80 端口只为四个已配置主机名执行 HTTPS 跳转，后端不再重复跳转。
+- 四个业务 HTTPS `server` 块严格按主机名路由；独立的 www HTTPS 块只向主域返回 301，不反代、不提供静态文件。不匹配的 Host 或直连 IP 请求仍由 `default_server` 直接拒绝。
+- 80 端口只为五个已配置主机名执行 HTTPS 跳转，后端不再重复跳转；www 随后由其 HTTPS 块规范化到主域。
 - 已知主机名的宽松档为每 IP 100 请求/秒、`burst=200 nodelay`；知了hub `/admin` 与 `/api` 的收紧档为每 IP 10 请求/秒、`burst=20 nodelay`；二者每 IP 并发上限均为 200。知天的收紧路径暂不配置，模板中保留醒目 TODO，等待其指挥师确认。
 - 未知 Host 与直连 IP 才使用严格档：每 IP 1 请求/秒、`burst=2 nodelay`、并发上限 8；普通未知请求被拒绝，超过阈值时返回 429。
 - 上述数字是缺少真实流量基线时的首版取值，并非已验证的最终阈值。上线后必须按 429 日志复核误伤与扫描噪音，再用真实证据调整。
@@ -96,7 +96,7 @@ certbot renew --deploy-hook 'docker compose --project-directory CHANGE_ME_GATEWA
 验法：从开发机访问一次，比对日志行首与开发机的真实出口 IP。
 **这一条不过，本文件里所有限速阈值都没有意义。**
 
-- 真实证书下四个主机名无需跳过 TLS 校验即可访问，并分别命中预期上游。
+- 真实证书下五个主机名无需跳过 TLS 校验即可访问；四个业务主机名分别命中预期上游，www 返回指向主域且保留路径与查询串的 301。
 - 从真实外部客户端请求后，gateway 日志中的 `$remote_addr` 是该客户端地址；继续核对两级后端最终采用的 IP 分桶键。
 - 无匹配 Host 的请求被默认服务器拒绝，超阈值请求返回 429 而不是 503。
 - SSE 连接持续至少 90 秒不被 gateway 中断。

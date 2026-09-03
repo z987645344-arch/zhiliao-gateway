@@ -7,6 +7,7 @@ services:
       - no-new-privileges:true
     environment:
       MAIN_SERVER_NAME: ${MAIN_SERVER_NAME:?MAIN_SERVER_NAME is required}
+      WWW_SERVER_NAME: ${WWW_SERVER_NAME:?WWW_SERVER_NAME is required}
       LAB_SERVER_NAME: ${LAB_SERVER_NAME:?LAB_SERVER_NAME is required}
       AGENT_SERVER_NAME: ${AGENT_SERVER_NAME:?AGENT_SERVER_NAME is required}
       ADMIN_SERVER_NAME: ${ADMIN_SERVER_NAME:?ADMIN_SERVER_NAME is required}

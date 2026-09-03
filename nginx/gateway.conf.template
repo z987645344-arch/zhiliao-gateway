@@ -65,8 +65,19 @@ server {
 # Gateway owns the only public HTTP-to-HTTPS redirect.
 server {
     listen 80;
-    server_name ${MAIN_SERVER_NAME} ${LAB_SERVER_NAME} ${AGENT_SERVER_NAME} ${ADMIN_SERVER_NAME};
+    server_name ${MAIN_SERVER_NAME} ${WWW_SERVER_NAME} ${LAB_SERVER_NAME} ${AGENT_SERVER_NAME} ${ADMIN_SERVER_NAME};
     return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${WWW_SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    return 301 https://${MAIN_SERVER_NAME}$request_uri;
 }
 
 server {

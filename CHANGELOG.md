@@ -2,6 +2,19 @@
 
 > 每轮完成改动后在此追加记录，新条目放在最前。
 
+## 2026-09-04 为关闭Cloudflare代理补齐www主域规范化
+
+- `.env.example` **+2/-0**：新增 `WWW_SERVER_NAME` 的 `CHANGE_ME_*` 占位，并注明它是 `MAIN_SERVER_NAME` 的规范化跳转别名。
+- `docker-compose.yml` **+1/-0**：把 `WWW_SERVER_NAME` 显式传入官方Nginx模板渲染环境；本仓库未启用 `NGINX_ENVSUBST_FILTER`，因此没有新增并不存在的白名单配置。
+- `nginx/gateway.conf.template` **+12/-1**：HTTP→HTTPS主机名列表纳入www；新增独立HTTPS块，以301永久跳转到主域并由 `$request_uri` 保留路径与查询串。四个业务反代块和两个default块未改。
+- `README.md` **+4/-4**：路由说明与上线验收同步为五个配置主机名，明确www只做主域规范化，四个业务主机名仍各自回源。
+- `CHANGELOG.md` **+13/-0**：新增本条普通工作记录，不写版本号、不暗示已经打标或部署。
+- **改动动因**：这是关闭Cloudflare代理的前置条件；此前www→主域跳转规则住在Cloudflare而非本仓库，直连gateway没有对应server块。它是“配置住在别处、本地仓库看不见”的实例，代理一关便会静默退回default 403。
+- **本场验证**：`docker compose --env-file .env.example config --quiet` 通过；官方 `nginx:stable-alpine` 完成envsubst后真实 `nginx -t` 通过，渲染结果无字面 `${WWW_SERVER_NAME}`。www实测返回301，`Location=https://main.example.com/deep/path?alpha=1&beta=2`，路径与查询串完整保留。
+- **既有路由回归证据**：主域请求返回502，但访问日志原文为 `upstream_addr="127.0.0.1:31001" upstream_status="502"`，决定性证明它仍命中hub反代块；未知Host实测403，日志为 `upstream_addr="-" upstream_status="-"`，证明default拒绝仍在且没有访问上游。
+- **测试夹具边界**：Docker Desktop的多个host-network容器不能互见回环假后端，第一次主域探测因此得到502；未修改仓库来迎合夹具，而是按实际访问日志判定路由归属。全部测试容器与临时证书均已清理。
+- **未验证边界**：本轮不连接服务器、不部署；真实通配符证书、真实域名以及关闭Cloudflare代理后的公网行为均未验证。
+
 ## Git标签 v0.1 - 2026-09-02
 
 - **本仓库的首个标签。覆盖 3 条工作条目、4 个提交**，其中 1 个提交属本轮存档动作本身（本条存档条目），**不是 4 件工作**：
