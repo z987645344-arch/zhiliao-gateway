@@ -100,6 +100,24 @@ server {
         return 200 "ok\n";
     }
 
+    location ~ ^/(?:api/admin/uploads|api/admin/lab/upload|admin/lab/upload)$ {
+        limit_req zone=sensitive burst=20 nodelay;
+        limit_conn perip 200;
+        client_body_timeout 300s;
+        proxy_request_buffering off;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_intercept_errors on;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_pass http://hub_backend;
+    }
+
     location ~ ^/(?:admin|api)(?:/|$) {
         limit_req zone=sensitive burst=20 nodelay;
         limit_conn perip 200;

@@ -2,6 +2,14 @@
 
 > 每轮完成改动后在此追加记录，新条目放在最前。
 
+## 2026-09-15 v0.2.1 候选 —— 纯修：上传 location 放宽 client_body_timeout 并关闭请求缓冲（60 s 408）
+
+- `nginx/gateway.conf.template`：只在 `${MAIN_SERVER_NAME}` 的 HTTPS server 中、既有 `^/(?:admin|api)(?:/|$)` 通用规则之前，新增精确上传 location；设置 `client_body_timeout 300s` 与 `proxy_request_buffering off`，其余限速、代理头、响应缓冲和超时与原敏感路径规则一致。知天两个 server、小作坊域 server、TLS、主机名、限速与 `client_max_body_size` 均未改。
+- **现状校正**：专用正则为 `^/(?:api/admin/uploads|api/admin/lab/upload|admin/lab/upload)$`。除指令列出的作品上传和小作坊无 JavaScript 回退入口外，同时覆盖当前小作坊 XHR 实际使用的 `/api/admin/lab/upload`；否则正常浏览器上传仍会落入通用规则，60 秒问题不会闭合。
+- **版本判断**：本轮只把既有大文件上传修到原定行为，用户操作方式不变，按三问定档属于纯修，候选号为 `v0.2.1`。
+- **验证与边界**：Docker Server `29.7.2` 下，`docker compose --env-file .env.example config --quiet` 通过；官方 `nginx:stable-alpine` 对按官方变量白名单语义渲染的配置执行真实 `nginx -t`，得到 `syntax is ok` 与 `test is successful`。渲染后未替换变量为 0，专用 location 恰有 1 处、位于第一个通用规则之前。首次夹具误用无白名单 `envsubst`，把 Nginx 自身变量替换为空后失败；修正夹具而未修改仓库实现。未连接服务器、未部署，线上 60 秒后 408 是否消失仍须部署后用慢速大文件实测。
+- **逐文件改动**（2 文件，+26/-0）：`CHANGELOG.md` +8/-0；`nginx/gateway.conf.template` +18/-0。
+
 ## Git标签 v0.2 - 2026-09-04
 
 - **覆盖 1 条工作条目、2 个提交**，其中 1 个属本轮存档动作本身：2026-09-04 为关闭Cloudflare代理补齐www主域规范化（`219c137`），以及本条存档提交。
