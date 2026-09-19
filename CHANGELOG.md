@@ -2,6 +2,11 @@
 
 > 每轮完成改动后在此追加记录，新条目放在最前。
 
+## 2026-09-20 v0.2.2 —— 纯修：client_max_body_size 100m→300m（配合站内 Unity WebGL 托管）
+
+- `nginx/gateway.conf.template`：仅把全局 `client_max_body_size` 从 `100m` 提高到 `300m`，使 gateway 不会先于站内 Unity WebGL 的 300 MB 上传上限拒绝请求；既有 location、限速、TLS 与超时配置均未改。
+- **部署边界**：gateway 仍只提供不小于后端的前置请求体上限，具体上传与解压限制继续由后端负责；本轮不连接服务器、不部署。
+
 ## 2026-09-15 v0.2.1 —— 纯修：上传 location 放宽 client_body_timeout 并关闭请求缓冲（60 s 408）
 
 - `nginx/gateway.conf.template`：只在 `${MAIN_SERVER_NAME}` 的 HTTPS server 中、既有 `^/(?:admin|api)(?:/|$)` 通用规则之前，新增精确上传 location；设置 `client_body_timeout 300s` 与 `proxy_request_buffering off`，其余限速、代理头、响应缓冲和超时与原敏感路径规则一致。知天两个 server、小作坊域 server、TLS、主机名、限速与 `client_max_body_size` 均未改。
