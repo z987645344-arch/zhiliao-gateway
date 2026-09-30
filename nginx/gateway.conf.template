@@ -76,6 +76,7 @@ server {
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
     ssl_certificate_key /etc/nginx/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     return 301 https://${MAIN_SERVER_NAME}$request_uri;
 }
@@ -87,6 +88,7 @@ server {
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
     ssl_certificate_key /etc/nginx/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     error_page 429 502 503 504 /50x.html;
 
     location = /50x.html {
@@ -158,6 +160,7 @@ server {
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
     ssl_certificate_key /etc/nginx/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     error_page 429 502 503 504 /50x.html;
 
     location = /50x.html {
@@ -211,6 +214,7 @@ server {
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
     ssl_certificate_key /etc/nginx/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     error_page 429 502 503 504 /50x.html;
 
     location = /50x.html {
@@ -252,6 +256,7 @@ server {
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
     ssl_certificate_key /etc/nginx/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     error_page 429 502 503 504 /50x.html;
 
     location = /50x.html {

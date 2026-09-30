@@ -5,6 +5,15 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    # 最小权限：绑定 80/443，master 切换到 nginx 用户并把缓存目录交给 worker。
+    # 只留 NET_BIND_SERVICE 时 nginx 会因 chown /var/cache/nginx 失败而无法启动。
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+      - CHOWN
     environment:
       MAIN_SERVER_NAME: ${MAIN_SERVER_NAME:?MAIN_SERVER_NAME is required}
       WWW_SERVER_NAME: ${WWW_SERVER_NAME:?WWW_SERVER_NAME is required}
