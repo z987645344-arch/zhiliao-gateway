@@ -40,10 +40,16 @@ gateway 固定传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto` 和 `
 - gateway 的职责是挡扫描噪音，不是重新实现业务限流。两个后端应用层已有按账号、角色或认证场景划分的精细分桶；若 gateway 在同一路径叠加更严的限制，实际先触发的是 gateway，等于架空后端分桶。因此采用“已知主机名从宽、default server 从严”的边界。
 - 知天已有两条 SSE：`POST /chat/stream` 用于30–90秒对话，`GET /tasks/{task_id}/stream` 用于时长随文档大小变化的入库进度。两者都不能被误归到未知的收紧路径。
 - 所有代理位置关闭响应缓冲，并把读取超时设为 300 秒，为 30–90 秒的 SSE 留出余量。
-- gateway 在 HTTP 层设置 `client_max_body_size 100m`，取当前两个后端上限的较大值，只为避免最外层提前返回 413；具体上传策略仍由各后端自身执行。gateway 的值必须始终不小于任一后端，任何项目提高上传上限时都必须回来复核这一项。
+- gateway 在 HTTP 层设置 `client_max_body_size 300m`（v0.2.2 起，配合站内 Unity WebGL 的 300 MB 上传上限），取当前两个后端上限的较大值，只为避免最外层提前返回 413；具体上传策略仍由各后端自身执行。gateway 的值必须始终不小于任一后端，任何项目提高上传上限时都必须回来复核这一项。
 - 429、502、503、504 共用 Nginx 镜像内的极简静态错误页；页面不显示后端名称或拓扑。
 - `/gateway-health` 由 gateway 直接返回 200，不访问任何后端；容器 healthcheck 按要求执行 `nginx -t`。gateway 不主动探测后端。
 - 访问日志包含客户端地址、入站 XFF、Host、状态码、请求耗时、上游地址和上游状态。
+- 五个已配置主机名的 HTTPS 响应（含 www 的 301）都带 `Strict-Transport-Security: max-age=31536000`；80 端口与未知 Host 的兜底块不发送。暂不加 `includeSubDomains` 与 `preload`：前者会把同域名下所有子域一并锁定为 HTTPS，后者一旦进入浏览器预加载列表很难撤回，等所有子域都确认长期 HTTPS 后再评估。
+
+## 容器权限
+
+- 容器以 `cap_drop: ALL` 丢弃全部 Linux capability，只加回四项：`NET_BIND_SERVICE`（在 host 网络下绑定 80/443）、`SETUID` 与 `SETGID`（master 进程切换到 `nginx` 用户运行 worker）、`CHOWN`（启动时把 `/var/cache/nginx` 下的临时目录交给 worker）。配合 `no-new-privileges`，worker 以非 root 的 `nginx` 用户处理请求。
+- 只加回 `NET_BIND_SERVICE` 是常见误配：官方镜像会在启动时报 `chown("/var/cache/nginx/client_temp", 101) failed (1: Operation not permitted)` 并退出。
 
 ## 配置与启动
 
@@ -101,3 +107,7 @@ certbot renew --deploy-hook 'docker compose --project-directory CHANGE_ME_GATEWA
 - 无匹配 Host 的请求被默认服务器拒绝，超阈值请求返回 429 而不是 503。
 - SSE 连接持续至少 90 秒不被 gateway 中断。
 - Certbot 续期后 reload 成功；另行制造 reload 失败，确认失败状态可被察觉且不掩盖证书已经续期的事实。
+
+## License
+
+当前仓库未附带开源许可证，默认保留全部权利；公开复用前请先联系项目作者。

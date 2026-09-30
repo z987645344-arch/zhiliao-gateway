@@ -2,6 +2,13 @@
 
 > 每轮完成改动后在此追加记录，新条目放在最前。
 
+## 2026-09-30 v0.2.3 —— 加固：网关容器最小权限与 HSTS
+
+- `docker-compose.yml`：新增 `cap_drop: ALL`，只加回 `NET_BIND_SERVICE`、`SETUID`、`SETGID`、`CHOWN`。此前网关是整套部署里最外层、却唯一没有收紧 capability 的容器；四项缺一不可，只留 `NET_BIND_SERVICE` 时官方镜像会因 chown `/var/cache/nginx/client_temp` 失败而无法启动。
+- `nginx/gateway.conf.template`：五个已配置主机名的 HTTPS server 块加入 `Strict-Transport-Security: max-age=31536000`（`always`，含 www 的 301）；80 端口与未知 Host 兜底块不加。暂不启用 `includeSubDomains` / `preload`。路由、限速、TLS 协议与超时均未改。
+- README 新增「容器权限」一节与 HSTS 说明，修正 `client_max_body_size` 的过期描述（100m → 300m，与 v0.2.2 模板一致），补充许可证说明。
+- **Docker 验证**：用占位主机名、自签证书与本轮配置真实启动官方 `nginx:stable-alpine`（host 网络）：容器 healthy、`nginx -t` 通过；master 为 root、worker 均为 `nginx` 用户；五个主机名的 HTTPS 响应带 HSTS，80 端口跳转与未知 Host 兜底不带；只保留 `NET_BIND_SERVICE` 的对照组复现上述 chown 启动失败。真实证书、真实域名与服务器部署仍待现场验收。
+
 ## 2026-09-20 v0.2.2 —— 纯修：client_max_body_size 100m→300m（配合站内 Unity WebGL 托管）
 
 - `nginx/gateway.conf.template`：仅把全局 `client_max_body_size` 从 `100m` 提高到 `300m`，使 gateway 不会先于站内 Unity WebGL 的 300 MB 上传上限拒绝请求；既有 location、限速、TLS 与超时配置均未改。
